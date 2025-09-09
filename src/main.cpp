@@ -123,7 +123,7 @@ void loop() {
       dumptruckChanged) {
 
     // Print in key-value pair format
-    Serial.print("{speed:");
+    Serial.print("speed:");
     Serial.print(speed);
     Serial.print(",steering:");
     Serial.print(steering);
@@ -132,8 +132,7 @@ void loop() {
     Serial.print(",gripper:");
     Serial.print(gripper);
     Serial.print(",dumptruck:");
-    Serial.print(dumptruck);
-    Serial.println("}");
+    Serial.println(dumptruck);
 
     // Update previous values
     previousSpeed = speed;
