@@ -21,6 +21,9 @@ uint8_t rightTopLeftPin = 10;   // Right top left button
 uint8_t rightTopButtonPin = 11; // Right top button
 uint8_t leftRightPin = 12;      // Left right button
 
+// Built-in LED pin 
+const uint8_t ledPin = LED_BUILTIN;
+
 // Movement and control variables
 int movement = 0;
 int rightJoystickX = 0;
@@ -98,6 +101,9 @@ int joystick_center = 512;
 
 void setup() {
   Serial.begin(115200);
+
+  // Configure built-in LED pin as output
+  pinMode(ledPin, OUTPUT);
 
   // Configure all button pins with internal pull-up resistors
   pinMode(rightUpTopPin, INPUT_PULLUP);
@@ -218,6 +224,13 @@ void loop() {
     movement = 0;
   } else if (movement < 0 && movement > -10) {
     movement = 0;
+  }
+
+  // LED ON when movement is 0, OFF when movement is above or below 0
+  if (movement == 0) {
+    digitalWrite(ledPin, HIGH); // Turn LED on
+  } else {
+    digitalWrite(ledPin, LOW); // Turn LED off
   }
 
   // Process joystick inputs (left joystick Y is inverted)
