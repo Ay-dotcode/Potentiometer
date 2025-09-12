@@ -166,39 +166,28 @@ void loop() {
   leftRightPressed = !digitalRead(leftRightPin);
 
   // Toggle buttons when pressed (rising edge detection)
-  if (rightUpTopPressed && !previousRightUpTopButton) {
+  if (rightUpTopPressed && !previousRightUpTopButton)
     rightUpTop = !rightUpTop;
-  }
-  if (rightJoystickButtonPressed && !previousRightJoystickButtonButton) {
+  if (rightJoystickButtonPressed && !previousRightJoystickButtonButton)
     rightJoystickButton = !rightJoystickButton;
-  }
-  if (leftLeftPressed && !previousLeftLeftButton) {
+  if (leftLeftPressed && !previousLeftLeftButton)
     leftLeft = !leftLeft;
-  }
-  if (rightDownTwoPressed && !previousRightDownTwoButton) {
+  if (rightDownTwoPressed && !previousRightDownTwoButton)
     rightDownTwo = !rightDownTwo;
-  }
-  if (rightDownOnePressed && !previousRightDownOneButton) {
+  if (rightDownOnePressed && !previousRightDownOneButton)
     rightDownOne = !rightDownOne;
-  }
-  if (leftJoystickButtonPressed && !previousLeftJoystickButtonButton) {
+  if (leftJoystickButtonPressed && !previousLeftJoystickButtonButton)
     leftJoystickButton = !leftJoystickButton;
-  }
-  if (rightDownThreePressed && !previousRightDownThreeButton) {
+  if (rightDownThreePressed && !previousRightDownThreeButton)
     rightDownThree = !rightDownThree;
-  }
-  if (rightTopRightPressed && !previousRightTopRightButton) {
+  if (rightTopRightPressed && !previousRightTopRightButton)
     rightTopRight = !rightTopRight;
-  }
-  if (rightTopLeftPressed && !previousRightTopLeftButton) {
+  if (rightTopLeftPressed && !previousRightTopLeftButton)
     rightTopLeft = !rightTopLeft;
-  }
-  if (rightTopButtonPressed && !previousRightTopButtonButton) {
+  if (rightTopButtonPressed && !previousRightTopButtonButton)
     rightTopButton = !rightTopButton;
-  }
-  if (leftRightPressed && !previousLeftRightButton) {
+  if (leftRightPressed && !previousLeftRightButton)
     leftRight = !leftRight;
-  }
 
   // Update previous button states
   previousRightUpTopButton = rightUpTopPressed;
@@ -304,7 +293,7 @@ void loop() {
     Serial.print(rightDownTwo);
     Serial.print(",RDownThree:");
     Serial.print(rightDownThree);
-    
+
     Serial.print(",RightUpTop:");
     Serial.print(rightUpTop);
     Serial.print(",RTopRight:");
