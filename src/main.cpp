@@ -2,337 +2,278 @@
 #include <math.h>
 
 // Analog pins
-uint8_t movementPin = A0;       // Movement
-uint8_t rightJoystickXPin = A1; // Right joystick X axis
-uint8_t rightJoystickYPin = A2; // Right joystick Y axis
-uint8_t leftJoystickXPin = A3;  // Left joystick X axis
-uint8_t leftJoystickYPin = A4;  // Left joystick Y axis
+uint8_t speedPin = A0;    // Speed
+uint8_t armZPin = A1;     // Right joystick X axis -> Arm Z
+uint8_t steeringPin = A2; // Right joystick Y axis -> Steering
+uint8_t armXPin = A3;     // Left joystick X axis -> Arm X
+uint8_t armYPin = A4;     // Left joystick Y axis -> Arm Y
 
 // Digital button pins
-uint8_t rightUpTopPin = 2;      // Right up top button
-uint8_t rightJoystickPin = 3;   // Right joystick button
-uint8_t leftLeftPin = 4;        // Left left button
-uint8_t rightDownTwoPin = 5;    // Right down two button
-uint8_t rightDownOnePin = 6;    // Right down one button
-uint8_t leftJoystickPin = 7;    // Left joystick button
-uint8_t rightDownThreePin = 8;  // Right down three button
-uint8_t rightTopRightPin = 9;   // Right top right button
-uint8_t rightTopLeftPin = 10;   // Right top left button
-uint8_t rightTopButtonPin = 11; // Right top button
-uint8_t leftRightPin = 12;      // Left right button
+uint8_t gripperPin = 2;             // Right Up Top -> Gripper
+uint8_t rightJoystickButtonPin = 3; // Right joystick button -> Stop (momentary)
+uint8_t L1Pin = 4;                  // Left Left -> L1
+uint8_t R2Pin = 5;                  // Right Down Two -> R2
+uint8_t R1Pin = 6;                  // Right Down One -> R1
+uint8_t armHomePin = 7; // Left joystick click -> Arm Home (momentary)
+uint8_t R3Pin = 8;      // Right Down Three -> R3
+uint8_t rightPin = 9;   // Right Up Right -> Right
+uint8_t leftPin = 10;   // Right Up Left -> Left
+uint8_t dumperPin = 11; // Right Up Down -> Dumper
+uint8_t L2Pin = 12;     // Left Right -> L2
 
-// Built-in LED pin 
+// Built-in LED pin
 const uint8_t ledPin = LED_BUILTIN;
 
-// Movement and control variables
-int movement = 0;
-int rightJoystickX = 0;
-int rightJoystickY = 0;
-int leftJoystickX = 0;
-int leftJoystickY = 0;
+// Analog variables
+int speed = 0;
+int steering = 0;
+int armX = 0;
+int armY = 0;
+int armZ = 0;
 
 // Button states
-bool rightUpTop = false;
-bool rightJoystickButton = false;
-bool leftLeft = false;
-bool rightDownTwo = false;
-bool rightDownOne = false;
-bool leftJoystickButton = false;
-bool rightDownThree = false;
-bool rightTopRight = false;
-bool rightTopLeft = false;
-bool rightTopButton = false;
-bool leftRight = false;
+bool gripper = false;
+bool stop = false;    // momentary
+bool armHome = false; // momentary
+bool L1 = false;
+bool R1 = false;
+bool R2 = false;
+bool R3 = false;
+bool right = false;
+bool left = false;
+bool dumper = false;
+bool L2 = false;
 
-// Previous values for change detection
-int previousMovement = 0;
-int previousRightJoystickX = 0;
-int previousRightJoystickY = 0;
-int previousLeftJoystickX = 0;
-int previousLeftJoystickY = 0;
+// Previous values
+int previousSpeed = 0;
+int previousSteering = 0;
+int previousArmX = 0;
+int previousArmY = 0;
+int previousArmZ = 0;
 
-bool previousRightUpTop = false;
-bool previousRightJoystickButton = false;
-bool previousLeftLeft = false;
-bool previousRightDownTwo = false;
-bool previousRightDownOne = false;
-bool previousLeftJoystickButton = false;
-bool previousRightDownThree = false;
-bool previousRightTopRight = false;
-bool previousRightTopLeft = false;
-bool previousRightTopButton = false;
-bool previousLeftRight = false;
+bool previousGripper = false;
+bool previousStop = false;
+bool previousArmHome = false;
+bool previousL1 = false;
+bool previousR1 = false;
+bool previousR2 = false;
+bool previousR3 = false;
+bool previousRight = false;
+bool previousLeft = false;
+bool previousDumper = false;
+bool previousL2 = false;
 
-// Button state tracking for toggle functionality
-bool rightUpTopPressed = false;
-bool rightJoystickButtonPressed = false;
-bool leftLeftPressed = false;
-bool rightDownTwoPressed = false;
-bool rightDownOnePressed = false;
-bool leftJoystickButtonPressed = false;
-bool rightDownThreePressed = false;
-bool rightTopRightPressed = false;
-bool rightTopLeftPressed = false;
-bool rightTopButtonPressed = false;
-bool leftRightPressed = false;
+// Pressed state for toggle buttons
+bool gripperPressed = false;
+bool L1Pressed = false;
+bool R1Pressed = false;
+bool R2Pressed = false;
+bool R3Pressed = false;
+bool rightPressed = false;
+bool leftPressed = false;
+bool dumperPressed = false;
+bool L2Pressed = false;
 
-bool previousRightUpTopButton = false;
-bool previousRightJoystickButtonButton = false;
-bool previousLeftLeftButton = false;
-bool previousRightDownTwoButton = false;
-bool previousRightDownOneButton = false;
-bool previousLeftJoystickButtonButton = false;
-bool previousRightDownThreeButton = false;
-bool previousRightTopRightButton = false;
-bool previousRightTopLeftButton = false;
-bool previousRightTopButtonButton = false;
-bool previousLeftRightButton = false;
+// Previous pressed state
+bool previousGripperButton = false;
+bool previousL1Button = false;
+bool previousR1Button = false;
+bool previousR2Button = false;
+bool previousR3Button = false;
+bool previousRightButton = false;
+bool previousLeftButton = false;
+bool previousDumperButton = false;
+bool previousL2Button = false;
 
-// Movement parameters
 int analog_max = 922;
 int analog_min = 155;
 int deadzone_min = 510;
 int deadzone_max = 520;
 
-// Joystick parameters
 int joystick_max = 1023;
 int joystick_min = 0;
 int joystick_center = 512;
 
 void setup() {
   Serial.begin(115200);
-
-  // Configure built-in LED pin as output
   pinMode(ledPin, OUTPUT);
 
-  // Configure all button pins with internal pull-up resistors
-  pinMode(rightUpTopPin, INPUT_PULLUP);
-  pinMode(rightJoystickPin, INPUT_PULLUP);
-  pinMode(leftLeftPin, INPUT_PULLUP);
-  pinMode(rightDownTwoPin, INPUT_PULLUP);
-  pinMode(rightDownOnePin, INPUT_PULLUP);
-  pinMode(leftJoystickPin, INPUT_PULLUP);
-  pinMode(rightDownThreePin, INPUT_PULLUP);
-  pinMode(rightTopRightPin, INPUT_PULLUP);
-  pinMode(rightTopLeftPin, INPUT_PULLUP);
-  pinMode(rightTopButtonPin, INPUT_PULLUP);
-  pinMode(leftRightPin, INPUT_PULLUP);
+  // Set button pins as INPUT_PULLUP
+  pinMode(gripperPin, INPUT_PULLUP);
+  pinMode(rightJoystickButtonPin, INPUT_PULLUP); // Stop
+  pinMode(L1Pin, INPUT_PULLUP);
+  pinMode(R2Pin, INPUT_PULLUP);
+  pinMode(R1Pin, INPUT_PULLUP);
+  pinMode(armHomePin, INPUT_PULLUP);
+  pinMode(R3Pin, INPUT_PULLUP);
+  pinMode(rightPin, INPUT_PULLUP);
+  pinMode(leftPin, INPUT_PULLUP);
+  pinMode(dumperPin, INPUT_PULLUP);
+  pinMode(L2Pin, INPUT_PULLUP);
 
   delay(2000);
 }
 
 int applyCurve(int linearValue) {
-  // Convert to float for calculation (-1.0 to 1.0)
   float normalized = linearValue / 50.0;
   float curved = pow(normalized, 3); // Cubic curve
-
   return (int)(curved * 50.0);
 }
 
 int mapJoystick(int rawValue, bool invert = false) {
-  if (invert) {
-    // Invert the raw value for upside-down joystick
+  if (invert)
     rawValue = joystick_max - rawValue + joystick_min;
-  }
 
   if (rawValue > joystick_center) {
-    // Right/Up side - map to 0 to 50
     int linearValue = map(rawValue, joystick_center, joystick_max, 0, 50);
-    linearValue = constrain(linearValue, 0, 50);
-    return applyCurve(linearValue);
+    return applyCurve(constrain(linearValue, 0, 50));
   } else if (rawValue < joystick_center) {
-    // Left/Down side - map to -50 to 0
     int linearValue = map(rawValue, joystick_min, joystick_center, -50, 0);
-    linearValue = constrain(linearValue, -50, 0);
-    return applyCurve(linearValue);
-  } else {
+    return applyCurve(constrain(linearValue, -50, 0));
+  } else
     return 0;
-  }
 }
 
 void loop() {
-  // Read all analog inputs
-  int rawMovement = analogRead(movementPin);
-  int rawRightJoystickX = analogRead(rightJoystickXPin);
-  int rawRightJoystickY = analogRead(rightJoystickYPin);
-  int rawLeftJoystickX = analogRead(leftJoystickXPin);
-  int rawLeftJoystickY = analogRead(leftJoystickYPin);
+  // Read analog inputs
+  int rawSpeed = analogRead(speedPin);
+  int rawArmZ = analogRead(armZPin);
+  int rawSteering = analogRead(steeringPin);
+  int rawArmX = analogRead(armXPin);
+  int rawArmY = analogRead(armYPin);
 
-  // Read all button states (inverted because of pull-up resistors)
-  rightUpTopPressed = !digitalRead(rightUpTopPin);
-  rightJoystickButtonPressed = !digitalRead(rightJoystickPin);
-  leftLeftPressed = !digitalRead(leftLeftPin);
-  rightDownTwoPressed = !digitalRead(rightDownTwoPin);
-  rightDownOnePressed = !digitalRead(rightDownOnePin);
-  leftJoystickButtonPressed = !digitalRead(leftJoystickPin);
-  rightDownThreePressed = !digitalRead(rightDownThreePin);
-  rightTopRightPressed = !digitalRead(rightTopRightPin);
-  rightTopLeftPressed = !digitalRead(rightTopLeftPin);
-  rightTopButtonPressed = !digitalRead(rightTopButtonPin);
-  leftRightPressed = !digitalRead(leftRightPin);
+  // Read button states
+  gripperPressed = !digitalRead(gripperPin);
+  bool stopPressed = !digitalRead(rightJoystickButtonPin); // momentary
+  armHome = !digitalRead(armHomePin);                      // momentary
+  L1Pressed = !digitalRead(L1Pin);
+  R1Pressed = !digitalRead(R1Pin);
+  R2Pressed = !digitalRead(R2Pin);
+  R3Pressed = !digitalRead(R3Pin);
+  rightPressed = !digitalRead(rightPin);
+  leftPressed = !digitalRead(leftPin);
+  dumperPressed = !digitalRead(dumperPin);
+  L2Pressed = !digitalRead(L2Pin);
 
-  // Toggle buttons when pressed (rising edge detection)
-  if (rightUpTopPressed && !previousRightUpTopButton)
-    rightUpTop = !rightUpTop;
-  if (rightJoystickButtonPressed && !previousRightJoystickButtonButton)
-    rightJoystickButton = !rightJoystickButton;
-  if (leftLeftPressed && !previousLeftLeftButton)
-    leftLeft = !leftLeft;
-  if (rightDownTwoPressed && !previousRightDownTwoButton)
-    rightDownTwo = !rightDownTwo;
-  if (rightDownOnePressed && !previousRightDownOneButton)
-    rightDownOne = !rightDownOne;
-  if (leftJoystickButtonPressed && !previousLeftJoystickButtonButton)
-    leftJoystickButton = !leftJoystickButton;
-  if (rightDownThreePressed && !previousRightDownThreeButton)
-    rightDownThree = !rightDownThree;
-  if (rightTopRightPressed && !previousRightTopRightButton)
-    rightTopRight = !rightTopRight;
-  if (rightTopLeftPressed && !previousRightTopLeftButton)
-    rightTopLeft = !rightTopLeft;
-  if (rightTopButtonPressed && !previousRightTopButtonButton)
-    rightTopButton = !rightTopButton;
-  if (leftRightPressed && !previousLeftRightButton)
-    leftRight = !leftRight;
+  // Toggle buttons
+  if (gripperPressed && !previousGripperButton)
+    gripper = !gripper;
+  if (L1Pressed && !previousL1Button)
+    L1 = !L1;
+  if (R1Pressed && !previousR1Button)
+    R1 = !R1;
+  if (R2Pressed && !previousR2Button)
+    R2 = !R2;
+  if (R3Pressed && !previousR3Button)
+    R3 = !R3;
+  if (rightPressed && !previousRightButton)
+    right = !right;
+  if (leftPressed && !previousLeftButton)
+    left = !left;
+  if (dumperPressed && !previousDumperButton)
+    dumper = !dumper;
+  if (L2Pressed && !previousL2Button)
+    L2 = !L2;
+
+  // Stop is momentary
+  stop = stopPressed;
 
   // Update previous button states
-  previousRightUpTopButton = rightUpTopPressed;
-  previousRightJoystickButtonButton = rightJoystickButtonPressed;
-  previousLeftLeftButton = leftLeftPressed;
-  previousRightDownTwoButton = rightDownTwoPressed;
-  previousRightDownOneButton = rightDownOnePressed;
-  previousLeftJoystickButtonButton = leftJoystickButtonPressed;
-  previousRightDownThreeButton = rightDownThreePressed;
-  previousRightTopRightButton = rightTopRightPressed;
-  previousRightTopLeftButton = rightTopLeftPressed;
-  previousRightTopButtonButton = rightTopButtonPressed;
-  previousLeftRightButton = leftRightPressed;
+  previousGripperButton = gripperPressed;
+  previousL1Button = L1Pressed;
+  previousR1Button = R1Pressed;
+  previousR2Button = R2Pressed;
+  previousR3Button = R3Pressed;
+  previousRightButton = rightPressed;
+  previousLeftButton = leftPressed;
+  previousDumperButton = dumperPressed;
+  previousL2Button = L2Pressed;
 
-  // Process movement with deadzone
-  if (rawMovement >= deadzone_max) {
-    movement = map(rawMovement, deadzone_max, analog_max, 0, 255);
-  } else if (rawMovement <= deadzone_min) {
-    movement = map(rawMovement, analog_min, deadzone_min, -255, 0);
-  } else {
-    movement = 0;
-  }
+  // Process speed
+  if (rawSpeed >= deadzone_max)
+    speed = map(rawSpeed, deadzone_max, analog_max, 0, 255);
+  else if (rawSpeed <= deadzone_min)
+    speed = map(rawSpeed, analog_min, deadzone_min, -255, 0);
+  else
+    speed = 0;
 
-  movement = constrain(movement, -255, 255);
+  speed = constrain(speed, -255, 255);
+  if (speed > 0 && speed < 10)
+    speed = 0;
+  if (speed < 0 && speed > -10)
+    speed = 0;
 
-  // Apply minimum threshold to movement
-  if (movement > 0 && movement < 10) {
-    movement = 0;
-  } else if (movement < 0 && movement > -10) {
-    movement = 0;
-  }
+  // LED on when speed = 0
+  digitalWrite(ledPin, speed == 0 ? HIGH : LOW);
 
-  // LED ON when movement is 0, OFF when movement is above or below 0
-  if (movement == 0) {
-    digitalWrite(ledPin, HIGH); // Turn LED on
-  } else {
-    digitalWrite(ledPin, LOW); // Turn LED off
-  }
+  // Process joysticks
+  armZ = mapJoystick(rawArmZ);
+  steering = mapJoystick(rawSteering);
+  armX = mapJoystick(rawArmX);
+  armY = mapJoystick(rawArmY, true);
 
-  // Process joystick inputs (left joystick Y is inverted)
-  rightJoystickX = mapJoystick(rawRightJoystickX);
-  rightJoystickY = mapJoystick(rawRightJoystickY);
-  leftJoystickX = mapJoystick(rawLeftJoystickX);
-  leftJoystickY = mapJoystick(rawLeftJoystickY, true); // Invert left joystick Y
+  // Detect changes
+  bool changed = (speed != previousSpeed) || (steering != previousSteering) ||
+                 (armX != previousArmX) || (armY != previousArmY) ||
+                 (armZ != previousArmZ) || (gripper != previousGripper) ||
+                 (stop != previousStop) || (armHome != previousArmHome) ||
+                 (L1 != previousL1) || (R1 != previousR1) ||
+                 (R2 != previousR2) || (R3 != previousR3) ||
+                 (right != previousRight) || (left != previousLeft) ||
+                 (dumper != previousDumper) || (L2 != previousL2);
 
-  // Check for changes in any values
-  bool movementChanged =
-      (movement != previousMovement && abs(movement - previousMovement) > 1);
-  bool rightJoystickXChanged =
-      (rightJoystickX != previousRightJoystickX &&
-       abs(rightJoystickX - previousRightJoystickX) > 1);
-  bool rightJoystickYChanged =
-      (rightJoystickY != previousRightJoystickY &&
-       abs(rightJoystickY - previousRightJoystickY) > 1);
-  bool leftJoystickXChanged = (leftJoystickX != previousLeftJoystickX &&
-                               abs(leftJoystickX - previousLeftJoystickX) > 1);
-  bool leftJoystickYChanged = (leftJoystickY != previousLeftJoystickY &&
-                               abs(leftJoystickY - previousLeftJoystickY) > 1);
-
-  bool rightUpTopChanged = (rightUpTop != previousRightUpTop);
-  bool rightJoystickButtonChanged =
-      (rightJoystickButton != previousRightJoystickButton);
-  bool leftLeftChanged = (leftLeft != previousLeftLeft);
-  bool rightDownTwoChanged = (rightDownTwo != previousRightDownTwo);
-  bool rightDownOneChanged = (rightDownOne != previousRightDownOne);
-  bool leftJoystickButtonChanged =
-      (leftJoystickButton != previousLeftJoystickButton);
-  bool rightDownThreeChanged = (rightDownThree != previousRightDownThree);
-  bool rightTopRightChanged = (rightTopRight != previousRightTopRight);
-  bool rightTopLeftChanged = (rightTopLeft != previousRightTopLeft);
-  bool rightTopButtonChanged = (rightTopButton != previousRightTopButton);
-  bool leftRightChanged = (leftRight != previousLeftRight);
-
-  // Print all values if any have changed
-  if (movementChanged || rightJoystickXChanged || rightJoystickYChanged ||
-      leftJoystickXChanged || leftJoystickYChanged || rightUpTopChanged ||
-      rightJoystickButtonChanged || leftLeftChanged || rightDownTwoChanged ||
-      rightDownOneChanged || leftJoystickButtonChanged ||
-      rightDownThreeChanged || rightTopRightChanged || rightTopLeftChanged ||
-      rightTopButtonChanged || leftRightChanged) {
-
-    // Print in key-value pair format
-    Serial.print("movement:");
-    Serial.print(movement);
-    // Serial.print("raw:");
-    // Serial.print(rawMovement);
-
-    Serial.print(",Rjoystick:");
-    Serial.print(rightJoystickX);
-    Serial.print(",");
-    Serial.print(rightJoystickY);
-    Serial.print(",Rbutton:");
-    Serial.print(rightJoystickButton);
-
-    Serial.print(",Ljoystick:");
-    Serial.print(leftJoystickX);
-    Serial.print(",");
-    Serial.print(leftJoystickY);
-    Serial.print(",Lbutton:");
-    Serial.print(leftJoystickButton);
-
-    Serial.print(",LeftLeft:");
-    Serial.print(leftLeft);
-    Serial.print(",LeftRight:");
-    Serial.print(leftRight);
-
-    Serial.print(",RDownOne:");
-    Serial.print(rightDownOne);
-    Serial.print(",RDownTwo:");
-    Serial.print(rightDownTwo);
-    Serial.print(",RDownThree:");
-    Serial.print(rightDownThree);
-
-    Serial.print(",RightUpTop:");
-    Serial.print(rightUpTop);
-    Serial.print(",RTopRight:");
-    Serial.print(rightTopRight);
-    Serial.print(",RTopLeft:");
-    Serial.print(rightTopLeft);
-    Serial.print(",RTopButton:");
-    Serial.println(rightTopButton);
+  if (changed) {
+    Serial.print("speed:");
+    Serial.print(speed);
+    Serial.print(",steering:");
+    Serial.print(steering);
+    Serial.print(",armX:");
+    Serial.print(armX);
+    Serial.print(",armY:");
+    Serial.print(armY);
+    Serial.print(",armZ:");
+    Serial.print(armZ);
+    Serial.print(",armHome:");
+    Serial.print(armHome);
+    Serial.print(",stop:");
+    Serial.print(stop);
+    Serial.print(",gripper:");
+    Serial.print(gripper);
+    Serial.print(",right:");
+    Serial.print(right);
+    Serial.print(",left:");
+    Serial.print(left);
+    Serial.print(",dumper:");
+    Serial.print(dumper);
+    Serial.print(",L1:");
+    Serial.print(L1);
+    Serial.print(",L2:");
+    Serial.print(L2);
+    Serial.print(",R1:");
+    Serial.print(R1);
+    Serial.print(",R2:");
+    Serial.print(R2);
+    Serial.print(",R3:");
+    Serial.print(R3);
+    Serial.println("");
 
     // Update previous values
-    previousMovement = movement;
-    previousRightJoystickX = rightJoystickX;
-    previousRightJoystickY = rightJoystickY;
-    previousLeftJoystickX = leftJoystickX;
-    previousLeftJoystickY = leftJoystickY;
-    previousRightUpTop = rightUpTop;
-    previousRightJoystickButton = rightJoystickButton;
-    previousLeftLeft = leftLeft;
-    previousRightDownTwo = rightDownTwo;
-    previousRightDownOne = rightDownOne;
-    previousLeftJoystickButton = leftJoystickButton;
-    previousRightDownThree = rightDownThree;
-    previousRightTopRight = rightTopRight;
-    previousRightTopLeft = rightTopLeft;
-    previousRightTopButton = rightTopButton;
-    previousLeftRight = leftRight;
+    previousSpeed = speed;
+    previousSteering = steering;
+    previousArmX = armX;
+    previousArmY = armY;
+    previousArmZ = armZ;
+    previousGripper = gripper;
+    previousStop = stop;
+    previousArmHome = armHome;
+    previousL1 = L1;
+    previousL2 = L2;
+    previousR1 = R1;
+    previousR2 = R2;
+    previousR3 = R3;
+    previousRight = right;
+    previousLeft = left;
+    previousDumper = dumper;
   }
 
   delay(50);
