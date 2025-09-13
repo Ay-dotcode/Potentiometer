@@ -177,9 +177,22 @@ void loop() {
   if (dumperPressed && !previousDumperButton)
     dumper = !dumper;
 
-  // Handle L2 for speed limit mode cycling
+  // Handle L2 for speed limit mode cycling with output
   if (L2Pressed && !previousL2Button) {
     speedLimitMode = (speedLimitMode + 1) % 3;
+    
+    Serial.print(",Mode:");
+    switch(speedLimitMode) {
+      case 0:
+        Serial.println("Full");
+        break;
+      case 1:
+        Serial.println("Slow");
+        break;
+      case 2:
+        Serial.println("Medium");
+        break;
+    }
   }
 
   // Stop is momentary
