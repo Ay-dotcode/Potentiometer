@@ -31,6 +31,10 @@ int armX = 0;
 int armY = 0;
 int armZ = 0;
 
+// Speed limit modes
+int speedLimitMode = 0; // 0 = 255, 1 = 50, 2 = 100
+int speedLimits[3] = {255, 50, 100};
+
 // Button states
 bool gripper = false;
 bool stop = false;    // momentary
@@ -85,8 +89,8 @@ bool previousLeftButton = false;
 bool previousDumperButton = false;
 bool previousL2Button = false;
 
-int analog_max = 922;
-int analog_min = 155;
+int analog_max = 898;
+int analog_min = 134;
 int deadzone_min = 510;
 int deadzone_max = 520;
 
@@ -172,8 +176,11 @@ void loop() {
     left = !left;
   if (dumperPressed && !previousDumperButton)
     dumper = !dumper;
-  if (L2Pressed && !previousL2Button)
-    L2 = !L2;
+
+  // Handle L2 for speed limit mode cycling
+  if (L2Pressed && !previousL2Button) {
+    speedLimitMode = (speedLimitMode + 1) % 3;
+  }
 
   // Stop is momentary
   stop = stopPressed;
@@ -190,18 +197,29 @@ void loop() {
   previousL2Button = L2Pressed;
 
   // Process speed
+  int rawSpeedValue = 0;
   if (rawSpeed >= deadzone_max)
-    speed = map(rawSpeed, deadzone_max, analog_max, 0, 255);
+    rawSpeedValue = map(rawSpeed, deadzone_max, analog_max, 0, 255);
   else if (rawSpeed <= deadzone_min)
-    speed = map(rawSpeed, analog_min, deadzone_min, -255, 0);
+    rawSpeedValue = map(rawSpeed, analog_min, deadzone_min, -255, 0);
   else
-    speed = 0;
+    rawSpeedValue = 0;
 
-  speed = constrain(speed, -255, 255);
-  if (speed > 0 && speed < 10)
+  rawSpeedValue = constrain(rawSpeedValue, -255, 255);
+  if (rawSpeedValue > 0 && rawSpeedValue < 10)
+    rawSpeedValue = 0;
+  if (rawSpeedValue < 0 && rawSpeedValue > -10)
+    rawSpeedValue = 0;
+
+  // Apply speed limit
+  int currentSpeedLimit = speedLimits[speedLimitMode];
+  if (rawSpeedValue > 0) {
+    speed = map(rawSpeedValue, 0, 255, 0, currentSpeedLimit);
+  } else if (rawSpeedValue < 0) {
+    speed = map(rawSpeedValue, -255, 0, -currentSpeedLimit, 0);
+  } else {
     speed = 0;
-  if (speed < 0 && speed > -10)
-    speed = 0;
+  }
 
   // LED on when speed = 0
   digitalWrite(ledPin, speed == 0 ? HIGH : LOW);
@@ -212,15 +230,18 @@ void loop() {
   armX = mapJoystick(rawArmX);
   armY = mapJoystick(rawArmY, true);
 
-  // Detect changes
-  bool changed = (speed != previousSpeed) || (steering != previousSteering) ||
+  // Check if speed difference is significant (more than 2)
+  bool speedChanged = abs(speed - previousSpeed) > 2;
+
+  // Detect changes (excluding L2 and using speed threshold)
+  bool changed = speedChanged || (steering != previousSteering) ||
                  (armX != previousArmX) || (armY != previousArmY) ||
                  (armZ != previousArmZ) || (gripper != previousGripper) ||
                  (stop != previousStop) || (armHome != previousArmHome) ||
                  (L1 != previousL1) || (R1 != previousR1) ||
                  (R2 != previousR2) || (R3 != previousR3) ||
                  (right != previousRight) || (left != previousLeft) ||
-                 (dumper != previousDumper) || (L2 != previousL2);
+                 (dumper != previousDumper);
 
   if (changed) {
     Serial.print("speed:");
@@ -247,8 +268,6 @@ void loop() {
     Serial.print(dumper);
     Serial.print(",L1:");
     Serial.print(L1);
-    Serial.print(",L2:");
-    Serial.print(L2);
     Serial.print(",R1:");
     Serial.print(R1);
     Serial.print(",R2:");
@@ -267,7 +286,6 @@ void loop() {
     previousStop = stop;
     previousArmHome = armHome;
     previousL1 = L1;
-    previousL2 = L2;
     previousR1 = R1;
     previousR2 = R2;
     previousR3 = R3;
