@@ -181,7 +181,7 @@ void loop() {
   if (L2Pressed && !previousL2Button) {
     speedLimitMode = (speedLimitMode + 1) % 3;
     
-    Serial.print(",Mode:");
+    Serial.print("Mode:");
     switch(speedLimitMode) {
       case 0:
         Serial.println("Full");
