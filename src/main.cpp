@@ -14,12 +14,12 @@ uint8_t rightJoystickButtonPin = 3; // Right joystick button -> Stop (momentary)
 uint8_t L1Pin = 4;                  // Left Left -> L1
 uint8_t R2Pin = 5;                  // Right Down Two -> R2
 uint8_t R1Pin = 6;                  // Right Down One -> R1
-uint8_t armHomePin = 7; // Left joystick click -> Arm Home (momentary)
-uint8_t R3Pin = 8;      // Right Down Three -> R3
-uint8_t rightPin = 9;   // Right Up Right -> Right
-uint8_t leftPin = 10;   // Right Up Left -> Left
-uint8_t dumperPin = 11; // Right Up Down -> Dumper
-uint8_t L2Pin = 12;     // Left Right -> L2
+uint8_t armHomePin = 7;     // Left joystick click -> Arm Home (momentary)
+uint8_t R3Pin = 8;          // Right Down Three -> R3
+uint8_t autoReleasePin = 9; // Right Up Right -> Auto Release (momentary)
+uint8_t leftPin = 10;       // Right Up Left -> Left
+uint8_t dumperPin = 11;     // Right Up Down -> Dumper
+uint8_t L2Pin = 12;         // Left Right -> L2
 
 // Built-in LED pin
 const uint8_t ledPin = LED_BUILTIN;
@@ -43,12 +43,12 @@ bool L1 = false;
 bool R1 = false;
 bool R2 = false;
 bool R3 = false;
-bool right = false;
+bool autoRelease = false; // momentary
 bool left = false;
 bool dumper = false;
 bool L2 = false;
 
-// Previous values
+// Previous values for raw inputs
 int previousSpeed = 0;
 int previousSteering = 0;
 int previousArmX = 0;
@@ -62,10 +62,19 @@ bool previousL1 = false;
 bool previousR1 = false;
 bool previousR2 = false;
 bool previousR3 = false;
-bool previousRight = false;
+bool previousAutoRelease = false;
 bool previousLeft = false;
 bool previousDumper = false;
 bool previousL2 = false;
+
+// Previous values for final output (after L1 logic)
+int previousFinalSpeed = 0;
+int previousFinalSteering = 0;
+int previousFinalArmX = 0;
+int previousFinalArmY = 0;
+int previousFinalArmZ = 0;
+bool previousFinalArmHome = false;
+bool previousFinalStop = false;
 
 // Pressed state for toggle buttons
 bool gripperPressed = false;
@@ -73,7 +82,7 @@ bool L1Pressed = false;
 bool R1Pressed = false;
 bool R2Pressed = false;
 bool R3Pressed = false;
-bool rightPressed = false;
+bool autoReleasePressed = false;
 bool leftPressed = false;
 bool dumperPressed = false;
 bool L2Pressed = false;
@@ -84,7 +93,7 @@ bool previousL1Button = false;
 bool previousR1Button = false;
 bool previousR2Button = false;
 bool previousR3Button = false;
-bool previousRightButton = false;
+bool previousAutoReleaseButton = false;
 bool previousLeftButton = false;
 bool previousDumperButton = false;
 bool previousL2Button = false;
@@ -110,7 +119,7 @@ void setup() {
   pinMode(R1Pin, INPUT_PULLUP);
   pinMode(armHomePin, INPUT_PULLUP);
   pinMode(R3Pin, INPUT_PULLUP);
-  pinMode(rightPin, INPUT_PULLUP);
+  pinMode(autoReleasePin, INPUT_PULLUP);
   pinMode(leftPin, INPUT_PULLUP);
   pinMode(dumperPin, INPUT_PULLUP);
   pinMode(L2Pin, INPUT_PULLUP);
@@ -154,7 +163,7 @@ void loop() {
   R1Pressed = !digitalRead(R1Pin);
   R2Pressed = !digitalRead(R2Pin);
   R3Pressed = !digitalRead(R3Pin);
-  rightPressed = !digitalRead(rightPin);
+  autoReleasePressed = !digitalRead(autoReleasePin); // momentary
   leftPressed = !digitalRead(leftPin);
   dumperPressed = !digitalRead(dumperPin);
   L2Pressed = !digitalRead(L2Pin);
@@ -162,16 +171,21 @@ void loop() {
   // Toggle buttons
   if (gripperPressed && !previousGripperButton)
     gripper = !gripper;
-  if (L1Pressed && !previousL1Button)
+  if (L1Pressed && !previousL1Button) {
     L1 = !L1;
+    // Print active mode when L1 changes
+    if (L1) {
+      Serial.println("Active: Arm");
+    } else {
+      Serial.println("Active: Car");
+    }
+  }
   if (R1Pressed && !previousR1Button)
     R1 = !R1;
   if (R2Pressed && !previousR2Button)
     R2 = !R2;
   if (R3Pressed && !previousR3Button)
     R3 = !R3;
-  if (rightPressed && !previousRightButton)
-    right = !right;
   if (leftPressed && !previousLeftButton)
     left = !left;
   if (dumperPressed && !previousDumperButton)
@@ -180,23 +194,24 @@ void loop() {
   // Handle L2 for speed limit mode cycling with output
   if (L2Pressed && !previousL2Button) {
     speedLimitMode = (speedLimitMode + 1) % 3;
-    
+
     Serial.print("Mode:");
-    switch(speedLimitMode) {
-      case 0:
-        Serial.println("Full");
-        break;
-      case 1:
-        Serial.println("Slow");
-        break;
-      case 2:
-        Serial.println("Medium");
-        break;
+    switch (speedLimitMode) {
+    case 0:
+      Serial.println("High");
+      break;
+    case 1:
+      Serial.println("Slow");
+      break;
+    case 2:
+      Serial.println("Medium");
+      break;
     }
   }
 
-  // Stop is momentary
+  // Stop and autoRelease are momentary
   stop = stopPressed;
+  autoRelease = autoReleasePressed;
 
   // Update previous button states
   previousGripperButton = gripperPressed;
@@ -204,7 +219,7 @@ void loop() {
   previousR1Button = R1Pressed;
   previousR2Button = R2Pressed;
   previousR3Button = R3Pressed;
-  previousRightButton = rightPressed;
+  previousAutoReleaseButton = autoReleasePressed;
   previousLeftButton = leftPressed;
   previousDumperButton = dumperPressed;
   previousL2Button = L2Pressed;
@@ -243,44 +258,52 @@ void loop() {
   armX = mapJoystick(rawArmX);
   armY = mapJoystick(rawArmY, true);
 
-  // Check if speed difference is significant (more than 2)
-  bool speedChanged = abs(speed - previousSpeed) > 2;
+  // Calculate final output values based on L1 state
+  int finalSpeed = L1 ? 0 : speed;
+  int finalSteering = L1 ? 0 : steering;
+  int finalArmX = L1 ? armX : 0;
+  int finalArmY = L1 ? armY : 0;
+  int finalArmZ = L1 ? armZ : 0;
+  bool finalArmHome = L1 ? armHome : false;
+  bool finalStop = L1 ? false : stop;
 
-  // Detect changes (excluding L2 and using speed threshold)
-  bool changed = speedChanged || (steering != previousSteering) ||
-                 (armX != previousArmX) || (armY != previousArmY) ||
-                 (armZ != previousArmZ) || (gripper != previousGripper) ||
-                 (stop != previousStop) || (armHome != previousArmHome) ||
-                 (L1 != previousL1) || (R1 != previousR1) ||
-                 (R2 != previousR2) || (R3 != previousR3) ||
-                 (right != previousRight) || (left != previousLeft) ||
-                 (dumper != previousDumper);
+  // Check for significant speed difference (more than 2)
+  bool speedChanged = abs(finalSpeed - previousFinalSpeed) > 2;
+
+  // Detect changes in final output values
+  bool changed =
+      speedChanged || (finalSteering != previousFinalSteering) ||
+      (finalArmX != previousFinalArmX) || (finalArmY != previousFinalArmY) ||
+      (finalArmZ != previousFinalArmZ) ||
+      (finalArmHome != previousFinalArmHome) ||
+      (finalStop != previousFinalStop) || (gripper != previousGripper) ||
+      (R1 != previousR1) || (R2 != previousR2) || (R3 != previousR3) ||
+      (autoRelease != previousAutoRelease) || (left != previousLeft) ||
+      (dumper != previousDumper);
 
   if (changed) {
     Serial.print("speed:");
-    Serial.print(speed);
+    Serial.print(finalSpeed);
     Serial.print(",steering:");
-    Serial.print(steering);
+    Serial.print(finalSteering);
     Serial.print(",armX:");
-    Serial.print(armX);
+    Serial.print(finalArmX);
     Serial.print(",armY:");
-    Serial.print(armY);
+    Serial.print(finalArmY);
     Serial.print(",armZ:");
-    Serial.print(armZ);
-    Serial.print(",armHome:");
-    Serial.print(armHome);
+    Serial.print(finalArmZ);
+    Serial.print(",armReset:");
+    Serial.print(finalArmHome);
     Serial.print(",stop:");
-    Serial.print(stop);
+    Serial.print(finalStop);
     Serial.print(",gripper:");
     Serial.print(gripper);
-    Serial.print(",right:");
-    Serial.print(right);
+    Serial.print(",autoRelease:");
+    Serial.print(autoRelease);
     Serial.print(",left:");
     Serial.print(left);
     Serial.print(",dumper:");
     Serial.print(dumper);
-    Serial.print(",L1:");
-    Serial.print(L1);
     Serial.print(",R1:");
     Serial.print(R1);
     Serial.print(",R2:");
@@ -289,20 +312,21 @@ void loop() {
     Serial.print(R3);
     Serial.println("");
 
-    // Update previous values
-    previousSpeed = speed;
-    previousSteering = steering;
-    previousArmX = armX;
-    previousArmY = armY;
-    previousArmZ = armZ;
+    // Update previous final output values
+    previousFinalSpeed = finalSpeed;
+    previousFinalSteering = finalSteering;
+    previousFinalArmX = finalArmX;
+    previousFinalArmY = finalArmY;
+    previousFinalArmZ = finalArmZ;
+    previousFinalArmHome = finalArmHome;
+    previousFinalStop = finalStop;
+
+    // Update other previous values
     previousGripper = gripper;
-    previousStop = stop;
-    previousArmHome = armHome;
-    previousL1 = L1;
     previousR1 = R1;
     previousR2 = R2;
     previousR3 = R3;
-    previousRight = right;
+    previousAutoRelease = autoRelease;
     previousLeft = left;
     previousDumper = dumper;
   }
