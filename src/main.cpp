@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include <math.h>
 
 // Analog pins
 uint8_t speedPin = A0;    // Speed
@@ -106,6 +105,7 @@ int deadzone_max = 520;
 int joystick_max = 1023;
 int joystick_min = 0;
 int joystick_center = 512;
+int joystick_deadzone = 50; // Deadzone around center for arm controls
 
 void setup() {
   Serial.begin(115200);
@@ -127,24 +127,43 @@ void setup() {
   delay(2000);
 }
 
-int applyCurve(int linearValue) {
-  float normalized = linearValue / 50.0;
-  float curved = pow(normalized, 3); // Cubic curve
-  return (int)(curved * 50.0);
-}
-
 int mapJoystick(int rawValue, bool invert = false) {
   if (invert)
     rawValue = joystick_max - rawValue + joystick_min;
 
+  // Add deadzone for steering control
+  if (rawValue >= (joystick_center - joystick_deadzone) &&
+      rawValue <= (joystick_center + joystick_deadzone)) {
+    return 0;
+  }
+
   if (rawValue > joystick_center) {
     int linearValue = map(rawValue, joystick_center, joystick_max, 0, 50);
-    return applyCurve(constrain(linearValue, 0, 50));
+    return constrain(linearValue, 0, 50);
   } else if (rawValue < joystick_center) {
     int linearValue = map(rawValue, joystick_min, joystick_center, -50, 0);
-    return applyCurve(constrain(linearValue, -50, 0));
+    return constrain(linearValue, -50, 0);
   } else
     return 0;
+}
+
+// New arm control mapping functions that return -1, 0, or 1
+int mapArmControl(int rawValue, bool invert = false) {
+  if (invert)
+    rawValue = joystick_max - rawValue + joystick_min;
+
+  // Define edge thresholds (only activate at extremes)
+  int edge_threshold = 100; // Distance from min/max to trigger -1/+1
+
+  // Check for edges: only send -1 or 1 when very close to min/max values
+  if (rawValue <= (joystick_min + edge_threshold)) {
+    return -1;
+  } else if (rawValue >= (joystick_max - edge_threshold)) {
+    return 1;
+  } else {
+    // Return 0 for everything in between (most of the joystick range)
+    return 0;
+  }
 }
 
 void loop() {
@@ -252,34 +271,41 @@ void loop() {
   // LED on when speed = 0
   digitalWrite(ledPin, speed == 0 ? HIGH : LOW);
 
-  // Process joysticks
-  armZ = mapJoystick(rawArmZ);
+  // Process joysticks - use new arm control mapping
+  armX = mapArmControl(rawArmX,
+                       true); // X axis: right=-1, center=0, left=1 (inverted)
+  armY = mapArmControl(rawArmY,
+                       true); // Y axis: up=-1, center=0, down=1 (inverted)
+  armZ = mapArmControl(rawArmZ, false); // Z axis: left=-1, center=0, right=1
+
   steering = mapJoystick(rawSteering);
-  armX = mapJoystick(rawArmX);
-  armY = mapJoystick(rawArmY, true);
 
   // Calculate final output values based on L1 state
   int finalSpeed = L1 ? 0 : speed;
   int finalSteering = L1 ? 0 : steering;
-  int finalArmX = L1 ? armX : 0;
-  int finalArmY = L1 ? armY : 0;
-  int finalArmZ = L1 ? armZ : 0;
+  int finalArmX = L1 ? armX : 0; // Default to 0 when not in arm mode
+  int finalArmY = L1 ? armY : 0; // Default to 0 when not in arm mode
+  int finalArmZ = L1 ? armZ : 0; // Default to 0 when not in arm mode
   bool finalArmHome = L1 ? armHome : false;
   bool finalStop = L1 ? false : stop;
 
   // Check for significant speed difference (more than 2)
   bool speedChanged = abs(finalSpeed - previousFinalSpeed) > 2;
 
+  // Check for arm changes (since values are now -1, 0, 1, any change is
+  // significant)
+  bool armChanged = (finalArmX != previousFinalArmX) ||
+                    (finalArmY != previousFinalArmY) ||
+                    (finalArmZ != previousFinalArmZ);
+
   // Detect changes in final output values
-  bool changed =
-      speedChanged || (finalSteering != previousFinalSteering) ||
-      (finalArmX != previousFinalArmX) || (finalArmY != previousFinalArmY) ||
-      (finalArmZ != previousFinalArmZ) ||
-      (finalArmHome != previousFinalArmHome) ||
-      (finalStop != previousFinalStop) || (gripper != previousGripper) ||
-      (R1 != previousR1) || (R2 != previousR2) || (R3 != previousR3) ||
-      (autoRelease != previousAutoRelease) || (left != previousLeft) ||
-      (dumper != previousDumper);
+  bool changed = speedChanged || (finalSteering != previousFinalSteering) ||
+                 armChanged || (finalArmHome != previousFinalArmHome) ||
+                 (finalStop != previousFinalStop) ||
+                 (gripper != previousGripper) || (R1 != previousR1) ||
+                 (R2 != previousR2) || (R3 != previousR3) ||
+                 (autoRelease != previousAutoRelease) ||
+                 (left != previousLeft) || (dumper != previousDumper);
 
   if (changed) {
     Serial.print("speed:");
