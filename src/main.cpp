@@ -31,14 +31,14 @@ int armY = 0;
 int armZ = 0;
 
 // Speed limit modes
-int speedLimitMode = 0; // 0 = 255, 1 = 50, 2 = 100
+int speedLimitMode = 1; // 0 = 255, 1 = 50, 2 = 100
 int speedLimits[3] = {255, 50, 100};
 
 // Button states
 bool gripper = false;
 bool stop = false;    // momentary
 bool armHome = false; // momentary
-bool L1 = false;
+bool L1 = true;
 bool R1 = false;
 bool R2 = false;
 bool R3 = false;
@@ -57,7 +57,7 @@ int previousArmZ = 0;
 bool previousGripper = false;
 bool previousStop = false;
 bool previousArmHome = false;
-bool previousL1 = false;
+bool previousL1 = true; 
 bool previousR1 = false;
 bool previousR2 = false;
 bool previousR3 = false;
@@ -125,6 +125,10 @@ void setup() {
   pinMode(L2Pin, INPUT_PULLUP);
 
   delay(2000);
+
+  // Print initial status
+  Serial.println("Active: Arm");
+  Serial.println("Mode:Slow");
 }
 
 int mapJoystick(int rawValue, bool invert = false) {
