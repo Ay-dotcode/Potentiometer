@@ -57,7 +57,7 @@ int previousArmZ = 0;
 bool previousGripper = false;
 bool previousStop = false;
 bool previousArmHome = false;
-bool previousL1 = true; 
+bool previousL1 = true;
 bool previousR1 = false;
 bool previousR2 = false;
 bool previousR3 = false;
@@ -278,8 +278,7 @@ void loop() {
   // Process joysticks - use new arm control mapping
   armX = mapArmControl(rawArmX,
                        true); // X axis: right=-1, center=0, left=1 (inverted)
-  armY = mapArmControl(rawArmY,
-                       true); // Y axis: up=-1, center=0, down=1 (inverted)
+  armY = mapArmControl(rawArmY); // Y axis: up=-1, center=0, down=1 (inverted)
   armZ = mapArmControl(rawArmZ, false); // Z axis: left=-1, center=0, right=1
 
   steering = mapJoystick(rawSteering);
