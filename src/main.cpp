@@ -12,7 +12,7 @@ uint8_t gripperPin = 2;             // Right Up Top -> Gripper
 uint8_t rightJoystickButtonPin = 3; // Right joystick button -> Stop (momentary)
 uint8_t L1Pin = 4;                  // Left Left -> L1
 uint8_t R2Pin = 5;                  // Right Down Two -> R2
-uint8_t R1Pin = 6;                  // Right Down One -> R1
+uint8_t R1Pin = 6;                  // Right Down One -> R1 (now lock button)
 uint8_t armHomePin = 7;     // Left joystick click -> Arm Home (momentary)
 uint8_t R3Pin = 8;          // Right Down Three -> R3
 uint8_t autoReleasePin = 9; // Right Up Right -> Auto Release (momentary)
@@ -39,7 +39,7 @@ bool gripper = false;
 bool stop = false;    // momentary
 bool armHome = false; // momentary
 bool L1 = true;
-bool R1 = false;
+bool R1 = true; // Lock button - default locked (true = locked)
 bool R2 = false;
 bool R3 = false;
 bool autoRelease = false; // momentary
@@ -58,7 +58,7 @@ bool previousGripper = false;
 bool previousStop = false;
 bool previousArmHome = false;
 bool previousL1 = true;
-bool previousR1 = false;
+bool previousR1 = true; // Default locked
 bool previousR2 = false;
 bool previousR3 = false;
 bool previousAutoRelease = false;
@@ -97,6 +97,9 @@ bool previousLeftButton = false;
 bool previousDumperButton = false;
 bool previousL2Button = false;
 
+// Lock state tracking
+bool previousDumperState = false; // Track dumper state for auto-lock
+
 int analog_max = 898;
 int analog_min = 134;
 int deadzone_min = 510;
@@ -129,6 +132,7 @@ void setup() {
   // Print initial status
   Serial.println("Active: Arm");
   Serial.println("Mode:Slow");
+  Serial.println("Lock: ON"); // Show initial lock state
 }
 
 int mapJoystick(int rawValue, bool invert = false) {
@@ -183,7 +187,7 @@ void loop() {
   bool stopPressed = !digitalRead(rightJoystickButtonPin); // momentary
   armHome = !digitalRead(armHomePin);                      // momentary
   L1Pressed = !digitalRead(L1Pin);
-  R1Pressed = !digitalRead(R1Pin);
+  R1Pressed = !digitalRead(R1Pin); // Lock button
   R2Pressed = !digitalRead(R2Pin);
   R3Pressed = !digitalRead(R3Pin);
   autoReleasePressed = !digitalRead(autoReleasePin); // momentary
@@ -191,9 +195,24 @@ void loop() {
   dumperPressed = !digitalRead(dumperPin);
   L2Pressed = !digitalRead(L2Pin);
 
-  // Toggle buttons
-  if (gripperPressed && !previousGripperButton)
+  // Handle R1 as lock toggle
+  if (R1Pressed && !previousR1Button) {
+    R1 = !R1; // Toggle lock state
+    // Print lock status
+    if (R1) {
+      Serial.println("Lock: ON");
+    } else {
+      Serial.println("Lock: OFF");
+    }
+  }
+
+  // Handle gripper toggle (only if unlocked)
+  if (gripperPressed && !previousGripperButton &&
+      !R1) { // Only toggle if unlocked
     gripper = !gripper;
+  }
+
+  // Handle L1 toggle
   if (L1Pressed && !previousL1Button) {
     L1 = !L1;
     // Print active mode when L1 changes
@@ -203,16 +222,27 @@ void loop() {
       Serial.println("Active: Car");
     }
   }
-  if (R1Pressed && !previousR1Button)
-    R1 = !R1;
+
+  // Handle other toggle buttons
   if (R2Pressed && !previousR2Button)
     R2 = !R2;
   if (R3Pressed && !previousR3Button)
     R3 = !R3;
   if (leftPressed && !previousLeftButton)
     left = !left;
-  if (dumperPressed && !previousDumperButton)
+
+  // Handle dumper toggle (only if unlocked)
+  if (dumperPressed && !previousDumperButton &&
+      !R1) { // Only toggle if unlocked
     dumper = !dumper;
+  }
+
+  // Auto-lock after dumper is closed
+  if (previousDumperState == true && dumper == false && !R1) {
+    R1 = true; // Lock when dumper goes from open to closed
+    Serial.println("Lock: ON (Auto-locked after dumper closed)");
+  }
+  previousDumperState = dumper; // Track dumper state
 
   // Handle L2 for speed limit mode cycling with output
   if (L2Pressed && !previousL2Button) {
@@ -276,10 +306,9 @@ void loop() {
   digitalWrite(ledPin, speed == 0 ? HIGH : LOW);
 
   // Process joysticks - use new arm control mapping
-  armX = mapArmControl(rawArmX,
-                       true); // X axis: right=-1, center=0, left=1 (inverted)
-  armY = mapArmControl(rawArmY); // Y axis: up=-1, center=0, down=1 (inverted)
-  armZ = mapArmControl(rawArmZ, false); // Z axis: left=-1, center=0, right=1
+  armX = mapArmControl(rawArmX, true);
+  armY = mapArmControl(rawArmY, true);
+  armZ = mapArmControl(rawArmZ, false);
 
   steering = mapJoystick(rawSteering);
 
@@ -301,13 +330,12 @@ void loop() {
                     (finalArmY != previousFinalArmY) ||
                     (finalArmZ != previousFinalArmZ);
 
-  // Detect changes in final output values
+  // Detect changes in final output values (removed R1 from comparison)
   bool changed = speedChanged || (finalSteering != previousFinalSteering) ||
                  armChanged || (finalArmHome != previousFinalArmHome) ||
                  (finalStop != previousFinalStop) ||
-                 (gripper != previousGripper) || (R1 != previousR1) ||
-                 (R2 != previousR2) || (R3 != previousR3) ||
-                 (autoRelease != previousAutoRelease) ||
+                 (gripper != previousGripper) || (R2 != previousR2) ||
+                 (R3 != previousR3) || (autoRelease != previousAutoRelease) ||
                  (left != previousLeft) || (dumper != previousDumper);
 
   if (changed) {
@@ -333,8 +361,6 @@ void loop() {
     Serial.print(left);
     Serial.print(",dumper:");
     Serial.print(dumper);
-    Serial.print(",R1:");
-    Serial.print(R1);
     Serial.print(",R2:");
     Serial.print(R2);
     Serial.print(",R3:");
@@ -352,7 +378,6 @@ void loop() {
 
     // Update other previous values
     previousGripper = gripper;
-    previousR1 = R1;
     previousR2 = R2;
     previousR3 = R3;
     previousAutoRelease = autoRelease;
