@@ -96,6 +96,7 @@ bool previousAutoReleaseButton = false;
 bool previousLeftButton = false;
 bool previousDumperButton = false;
 bool previousL2Button = false;
+bool previousStopButton = false; // Added for stop button tracking
 
 // Lock state tracking
 bool previousDumperState = false; // Track dumper state for auto-lock
@@ -185,7 +186,7 @@ void loop() {
   // Read button states
   gripperPressed = !digitalRead(gripperPin);
   bool stopPressed = !digitalRead(rightJoystickButtonPin); // momentary
-  armHome = !digitalRead(armHomePin);                      // momentary
+  bool armHomePressed = !digitalRead(armHomePin);          // momentary
   L1Pressed = !digitalRead(L1Pin);
   R1Pressed = !digitalRead(R1Pin); // Lock button
   R2Pressed = !digitalRead(R2Pin);
@@ -206,9 +207,8 @@ void loop() {
     }
   }
 
-  // Handle gripper toggle (only if unlocked)
-  if (gripperPressed && !previousGripperButton &&
-      !R1) { // Only toggle if unlocked
+  // Handle gripper toggle
+  if (gripperPressed && !previousGripperButton) {
     gripper = !gripper;
   }
 
@@ -262,12 +262,14 @@ void loop() {
     }
   }
 
-  // Stop and autoRelease are momentary
+  // Handle momentary buttons - these update when pressed OR released
   stop = stopPressed;
+  armHome = armHomePressed;
   autoRelease = autoReleasePressed;
 
   // Update previous button states
   previousGripperButton = gripperPressed;
+  previousStopButton = stopPressed; // Track stop button state
   previousL1Button = L1Pressed;
   previousR1Button = R1Pressed;
   previousR2Button = R2Pressed;
@@ -307,7 +309,7 @@ void loop() {
 
   // Process joysticks - use new arm control mapping
   armX = mapArmControl(rawArmX, true);
-  armY = mapArmControl(rawArmY, true);
+  armY = mapArmControl(rawArmY, false);
   armZ = mapArmControl(rawArmZ, false);
 
   steering = mapJoystick(rawSteering);
@@ -319,7 +321,7 @@ void loop() {
   int finalArmY = L1 ? armY : 0; // Default to 0 when not in arm mode
   int finalArmZ = L1 ? armZ : 0; // Default to 0 when not in arm mode
   bool finalArmHome = L1 ? armHome : false;
-  bool finalStop = L1 ? false : stop;
+  bool finalStop = stop; // Stop should work in both modes
 
   // Check for significant speed difference (more than 2)
   bool speedChanged = abs(finalSpeed - previousFinalSpeed) > 2;
@@ -330,7 +332,7 @@ void loop() {
                     (finalArmY != previousFinalArmY) ||
                     (finalArmZ != previousFinalArmZ);
 
-  // Detect changes in final output values (removed R1 from comparison)
+  // Detect changes in final output values
   bool changed = speedChanged || (finalSteering != previousFinalSteering) ||
                  armChanged || (finalArmHome != previousFinalArmHome) ||
                  (finalStop != previousFinalStop) ||
@@ -378,6 +380,8 @@ void loop() {
 
     // Update other previous values
     previousGripper = gripper;
+    previousStop = stop;       // Update previous stop state
+    previousArmHome = armHome; // Update previous armHome state
     previousR2 = R2;
     previousR3 = R3;
     previousAutoRelease = autoRelease;
